@@ -1,0 +1,7 @@
+# Sample data files for testing
+# Replace these with your actual marketing and business data
+
+date,tactic,state,campaign,impressions,clicks,spend,attributed_revenue
+2024-01-01,Video,CA,FB_Brand_Awareness,5000,75,60.50,240.00
+2024-01-01,Image,NY,FB_Conversion,4500,120,95.25,380.00
+# Add more rows as needed...
