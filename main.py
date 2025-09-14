@@ -494,102 +494,139 @@ def main():
     # Marketing Funnel Analysis
     st.header("🔄 Marketing Funnel Analysis")
     
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        # Calculate funnel metrics
-        total_impressions = filtered_marketing['impressions'].sum()
-        total_clicks = filtered_marketing['clicks'].sum()
-        total_attributed_revenue = filtered_marketing['attributed_revenue'].sum()
+    try:
+        col1, col2 = st.columns([2, 1])
         
-        # Estimate conversions (assuming average order value)
-        avg_aov = filtered_combined['aov'].mean() if 'aov' in filtered_combined.columns else 100
-        estimated_conversions = total_attributed_revenue / avg_aov if avg_aov > 0 else 0
+        with col1:
+            # Calculate funnel metrics
+            total_impressions = filtered_marketing['impressions'].sum()
+            total_clicks = filtered_marketing['clicks'].sum()
+            total_attributed_revenue = filtered_marketing['attributed_revenue'].sum()
+            
+            # Estimate conversions (assuming average order value)
+            avg_aov = filtered_combined['aov'].mean() if 'aov' in filtered_combined.columns else 100
+            estimated_conversions = total_attributed_revenue / avg_aov if avg_aov > 0 else 0
+            
+            # Calculate conversion rates
+            ctr = (total_clicks / total_impressions * 100) if total_impressions > 0 else 0
+            conversion_rate = (estimated_conversions / total_clicks * 100) if total_clicks > 0 else 0
+            
+            # Only proceed if we have valid data
+            if total_impressions > 0 and total_clicks > 0:
+                # Funnel visualization using bar chart (more compatible)
+                funnel_data = pd.DataFrame({
+                    'Stage': ['Impressions', 'Clicks', 'Conversions'],
+                    'Count': [total_impressions, total_clicks, estimated_conversions],
+                    'Conversion_Rate': [100, ctr, conversion_rate]
+                })
+                
+                # Create a horizontal bar chart that looks like a funnel
+                fig_funnel = px.bar(
+                    funnel_data,
+                    x='Count',
+                    y='Stage',
+                    orientation='h',
+                    title="Marketing Funnel Performance",
+                    color='Conversion_Rate',
+                    color_continuous_scale='RdYlGn',
+                    text='Count'
+                )
+                
+                # Format the text on bars
+                fig_funnel.update_traces(
+                    texttemplate='%{text:,.0f} (%{customdata:.1f}%)',
+                    customdata=funnel_data['Conversion_Rate'],
+                    textposition="inside"
+                )
+                
+                fig_funnel.update_layout(
+                    height=400,
+                    yaxis={'categoryorder': 'array', 'categoryarray': ['Conversions', 'Clicks', 'Impressions']}
+                )
+                st.plotly_chart(fig_funnel, use_container_width=True)
+                
+                # Funnel metrics by channel
+                st.subheader("📊 Channel Funnel Comparison")
+                
+                channel_funnel = filtered_marketing.groupby('channel').agg({
+                    'impressions': 'sum',
+                    'clicks': 'sum',
+                    'attributed_revenue': 'sum'
+                }).reset_index()
+                
+                channel_funnel['CTR'] = (channel_funnel['clicks'] / channel_funnel['impressions'] * 100).round(2)
+                channel_funnel['Est_Conversions'] = (channel_funnel['attributed_revenue'] / avg_aov).round(0)
+                channel_funnel['CVR'] = (channel_funnel['Est_Conversions'] / channel_funnel['clicks'] * 100).round(2)
+                
+                # Format for display
+                funnel_display = channel_funnel.copy()
+                funnel_display['Impressions'] = funnel_display['impressions'].apply(lambda x: f"{x:,}")
+                funnel_display['Clicks'] = funnel_display['clicks'].apply(lambda x: f"{x:,}")
+                funnel_display['Conversions'] = funnel_display['Est_Conversions'].apply(lambda x: f"{x:,.0f}")
+                
+                st.dataframe(
+                    funnel_display[['channel', 'Impressions', 'Clicks', 'CTR', 'Conversions', 'CVR']],
+                    use_container_width=True
+                )
+            else:
+                st.warning("⚠️ Insufficient data for funnel analysis")
         
-        # Calculate conversion rates
-        ctr = (total_clicks / total_impressions * 100) if total_impressions > 0 else 0
-        conversion_rate = (estimated_conversions / total_clicks * 100) if total_clicks > 0 else 0
-        
-        # Funnel visualization
-        funnel_data = pd.DataFrame({
-            'Stage': ['Impressions', 'Clicks', 'Conversions'],
-            'Count': [total_impressions, total_clicks, estimated_conversions],
-            'Percentage': [100, ctr, conversion_rate]
-        })
-        
-        fig_funnel = px.funnel(
-            funnel_data,
-            x='Count',
-            y='Stage',
-            title="Marketing Funnel Performance",
-            color='Percentage',
-            color_continuous_scale='RdYlGn'
-        )
-        fig_funnel.update_layout(height=400)
-        st.plotly_chart(fig_funnel, use_container_width=True)
-        
-        # Funnel metrics by channel
-        st.subheader("📊 Channel Funnel Comparison")
-        
-        channel_funnel = filtered_marketing.groupby('channel').agg({
-            'impressions': 'sum',
-            'clicks': 'sum',
-            'attributed_revenue': 'sum'
-        }).reset_index()
-        
-        channel_funnel['CTR'] = (channel_funnel['clicks'] / channel_funnel['impressions'] * 100).round(2)
-        channel_funnel['Est_Conversions'] = (channel_funnel['attributed_revenue'] / avg_aov).round(0)
-        channel_funnel['CVR'] = (channel_funnel['Est_Conversions'] / channel_funnel['clicks'] * 100).round(2)
-        
-        # Format for display
-        funnel_display = channel_funnel.copy()
-        funnel_display['Impressions'] = funnel_display['impressions'].apply(lambda x: f"{x:,}")
-        funnel_display['Clicks'] = funnel_display['clicks'].apply(lambda x: f"{x:,}")
-        funnel_display['Conversions'] = funnel_display['Est_Conversions'].apply(lambda x: f"{x:,.0f}")
-        
-        st.dataframe(
-            funnel_display[['channel', 'Impressions', 'Clicks', 'CTR', 'Conversions', 'CVR']],
-            use_container_width=True
-        )
-    
-    with col2:
-        st.subheader("⚡ Funnel Insights")
-        
-        # Overall funnel performance
-        st.markdown(f"""
-        <div class="metric-card">
-            <h4>Overall Funnel Performance</h4>
-            <p><strong>Click-Through Rate:</strong> {ctr:.2f}%</p>
-            <p><strong>Conversion Rate:</strong> {conversion_rate:.2f}%</p>
-            <p><strong>Overall Conversion:</strong> {(estimated_conversions/total_impressions*100):.3f}%</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Best performing channel in funnel
-        best_ctr_channel = channel_funnel.loc[channel_funnel['CTR'].idxmax(), 'channel']
-        best_cvr_channel = channel_funnel.loc[channel_funnel['CVR'].idxmax(), 'channel']
-        
-        st.markdown(f"""
-        <div class="insight-card">
-            <h4>🎯 Funnel Optimization</h4>
-            <p><strong>{best_ctr_channel}</strong> has the best CTR</p>
-            <p><strong>{best_cvr_channel}</strong> has the best conversion rate</p>
-            <p>Focus on improving conversion rates for better ROI</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Improvement opportunities
-        worst_ctr = channel_funnel['CTR'].min()
-        worst_cvr = channel_funnel['CVR'].min()
-        
-        st.markdown(f"""
-        <div class="insight-card">
-            <h4>📈 Improvement Opportunities</h4>
-            <p>Lowest CTR: {worst_ctr:.2f}% - optimize ad creative</p>
-            <p>Lowest CVR: {worst_cvr:.2f}% - improve landing pages</p>
-            <p>Focus on weak points in the funnel</p>
-        </div>
-        """, unsafe_allow_html=True)
+        with col2:
+            st.subheader("⚡ Funnel Insights")
+            
+            if total_impressions > 0 and total_clicks > 0:
+                # Overall funnel performance
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h4>Overall Funnel Performance</h4>
+                    <p><strong>Click-Through Rate:</strong> {ctr:.2f}%</p>
+                    <p><strong>Conversion Rate:</strong> {conversion_rate:.2f}%</p>
+                    <p><strong>Overall Conversion:</strong> {(estimated_conversions/total_impressions*100):.3f}%</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Best performing channel in funnel
+                if len(filtered_marketing) > 0 and 'channel' in filtered_marketing.columns:
+                    channel_funnel = filtered_marketing.groupby('channel').agg({
+                        'impressions': 'sum',
+                        'clicks': 'sum',
+                        'attributed_revenue': 'sum'
+                    }).reset_index()
+                    
+                    channel_funnel['CTR'] = (channel_funnel['clicks'] / channel_funnel['impressions'] * 100).round(2)
+                    channel_funnel['CVR'] = ((channel_funnel['attributed_revenue'] / avg_aov) / channel_funnel['clicks'] * 100).round(2)
+                    
+                    if len(channel_funnel) > 0:
+                        best_ctr_channel = channel_funnel.loc[channel_funnel['CTR'].idxmax(), 'channel']
+                        best_cvr_channel = channel_funnel.loc[channel_funnel['CVR'].idxmax(), 'channel']
+                        
+                        st.markdown(f"""
+                        <div class="insight-card">
+                            <h4>🎯 Funnel Optimization</h4>
+                            <p><strong>{best_ctr_channel}</strong> has the best CTR</p>
+                            <p><strong>{best_cvr_channel}</strong> has the best conversion rate</p>
+                            <p>Focus on improving conversion rates for better ROI</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Improvement opportunities
+                        worst_ctr = channel_funnel['CTR'].min()
+                        worst_cvr = channel_funnel['CVR'].min()
+                        
+                        st.markdown(f"""
+                        <div class="insight-card">
+                            <h4>📈 Improvement Opportunities</h4>
+                            <p>Lowest CTR: {worst_ctr:.2f}% - optimize ad creative</p>
+                            <p>Lowest CVR: {worst_cvr:.2f}% - improve landing pages</p>
+                            <p>Focus on weak points in the funnel</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.info("📊 Need data for funnel insights")
+                
+    except Exception as e:
+        st.error(f"Error in funnel analysis: {str(e)}")
+        st.info("📊 Funnel analysis temporarily unavailable")
     
     # Seasonality & Time Analysis
     st.header("📅 Seasonality & Time Analysis")
